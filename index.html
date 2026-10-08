@@ -75,13 +75,8 @@ strong{font-weight:600;color:var(--t1)}
 .d0{background:var(--brand-1)}.d1{background:var(--green-1)}.d2{background:var(--t3)}
 
 main{flex:1;min-width:0;padding:26px 40px 140px}
-/* 宽屏下正文不再被 940px 卡住：撑满剩余宽度；卡片按栏流动，避免超长行 */
+/* 卡片一行一条，自上而下按顺序排，不并排、不重排顺序 */
 .cards{display:block}
-@media (min-width:1400px){
-  .cards{columns:2;column-gap:16px}
-  .cards .card{break-inside:avoid;page-break-inside:avoid;-webkit-column-break-inside:avoid}
-}
-@media (min-width:2000px){.cards{columns:3}}
 section{margin-bottom:44px}
 .sec-h{display:flex;align-items:baseline;gap:12px;padding-bottom:10px;border-bottom:2px solid var(--divider);margin-bottom:6px}
 .sec-h h2{font-size:22px;font-weight:600;margin:0;letter-spacing:-.2px}
@@ -182,7 +177,6 @@ footer a{color:var(--t2)}
 }
 @media print{
   .bar,.toc,#top,.bm{display:none}
-  .cards{columns:1!important}
   main{max-width:none;padding:0}
   .card{break-inside:avoid;border-color:#ccc}
   .src .sbody{display:block}
