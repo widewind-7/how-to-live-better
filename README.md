@@ -16,6 +16,10 @@
   读到的地方」。位置存在本地（键 `hltb-readpos`），换设备不同步。
 - **检查更新**：页面打开时对照 GitHub 上本仓库 `index.html` 的最新提交，顶栏显示
   「已是最新 <版本>」或「已更新到 <版本>，刷新即用新版」；离线或接口失败时安静降级。
+- **Hermes Agent 技能**：`hermes-skill/` 里放了一份给 [Hermes Agent](https://hermes-agent.nousresearch.com/)
+  用的「人生决策」技能（`life-decision-guide`）。装上以后提到「人生指南」，或问「该不该 / 值不值 /
+  怎么选 / 犯不犯法」，助手会先查书里的条目再回答，并注明出自第几节第几条。装法见
+  [`hermes-skill/README.md`](hermes-skill/README.md)。规则移植自上游的 `skills/life-decision-guide`（MIT）。
 
 ## 这是什么
 
