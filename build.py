@@ -39,6 +39,10 @@ REPO = Path(ARGS.repo or os.environ.get("HLTB_REPO") or r"D:\Agent\HowToLiveBett
 
 UPSTREAM = "https://github.com/eternity4719/HowToLiveBetter"
 
+# 本页发布在哪：owner/repo。写进页面头部，供“检查更新”查询用。
+# 改成你自己的仓库时同步改这里。
+PAGE_REPO = "widewind-7/how-to-live-better"
+
 
 def avail_sections():
     """扫描 book/ 目录，得到实际存在的节号。"""
@@ -227,6 +231,9 @@ strong{font-weight:600;color:var(--t1)}
 .btn:hover{border-color:var(--brand-2);color:var(--t1)}
 .btn[aria-pressed=true]{background:var(--brand-soft);border-color:var(--brand-1);color:var(--brand-1)}
 .count{font-size:12px;color:var(--t3);white-space:nowrap;font-variant-numeric:tabular-nums}
+.sync{font-size:12px;color:var(--t3);white-space:nowrap;display:inline-flex;gap:4px;align-items:center}
+.sync .sv{color:var(--brand-1);font-variant-numeric:tabular-nums}
+.sync.err .sv{color:var(--red-1)}
 .jump{display:none;height:30px;max-width:38vw;padding:0 6px;border-radius:8px;border:1px solid var(--divider);
   background:var(--bg-elv);color:var(--t2);font:500 12px/1 var(--font)}
 
@@ -245,7 +252,14 @@ strong{font-weight:600;color:var(--t1)}
 .dot{width:6px;height:6px;border-radius:50%;flex:none;margin-top:6px}
 .d0{background:var(--brand-1)}.d1{background:var(--green-1)}.d2{background:var(--t3)}
 
-main{flex:1;min-width:0;padding:26px 40px 140px;max-width:940px}
+main{flex:1;min-width:0;padding:26px 40px 140px}
+/* 宽屏下正文不再被 940px 卡住：撑满剩余宽度；卡片按栏流动，避免超长行 */
+.cards{display:block}
+@media (min-width:1400px){
+  .cards{columns:2;column-gap:16px}
+  .cards .card{break-inside:avoid;page-break-inside:avoid;-webkit-column-break-inside:avoid}
+}
+@media (min-width:2000px){.cards{columns:3}}
 section{margin-bottom:44px}
 .sec-h{display:flex;align-items:baseline;gap:12px;padding-bottom:10px;border-bottom:2px solid var(--divider);margin-bottom:6px}
 .sec-h h2{font-size:22px;font-weight:600;margin:0;letter-spacing:-.2px}
@@ -256,7 +270,12 @@ section{margin-bottom:44px}
 .chead{display:flex;gap:10px;align-items:flex-start}
 .num{flex:none;min-width:24px;height:24px;padding:0 6px;border-radius:7px;background:var(--bg-mute);color:var(--t3);
   font:600 12px/24px var(--font);text-align:center;font-variant-numeric:tabular-nums}
-.chead h3{margin:0;font-size:16px;font-weight:600;line-height:1.5;letter-spacing:-.1px}
+.chead h3{flex:1;min-width:0;margin:0;font-size:16px;font-weight:600;line-height:1.5;letter-spacing:-.1px}
+.bm{flex:none;border:0;background:transparent;color:var(--t3);cursor:pointer;
+  font:400 16px/1 var(--font);padding:2px 3px;border-radius:6px;transition:color .15s,transform .15s}
+.bm:hover{color:var(--brand-1);transform:scale(1.12)}
+.card.bookmarked{border-color:var(--brand-1)}
+.card.bookmarked .bm{color:#e6a700}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 12px 34px}
 .badge{font:500 11px/1 var(--font);padding:4px 9px;border-radius:999px;border:1px solid transparent}
 .gA{background:var(--green-soft);color:var(--green-1);border-color:var(--green-soft)}
@@ -309,14 +328,15 @@ footer a{color:var(--t2)}
   .spacer{display:none}
   .jump{order:2}
   #theme{order:3}
-  #f-all{order:4}#f-a{order:5}#f-plain{order:6}
-  .count{order:7;margin-left:auto}
-  .search{order:8;width:auto;max-width:none;flex:1 1 100%;margin-top:2px}
+  #f-all{order:4}#f-a{order:5}#f-plain{order:6}#f-bm{order:7}
+  .count{order:8;margin-left:auto}
+  .search{order:9;width:auto;max-width:none;flex:1 1 100%;margin-top:2px}
   .search input{height:34px}
   .search kbd{display:none}
   /* 向下滚动后收成一行（标题+搜索+明暗），把竖向空间还给正文；滚回顶部再展开 */
   body.compact .jump,body.compact #f-all,body.compact #f-a,
-  body.compact #f-plain,body.compact .count{display:none}
+  body.compact #f-plain,body.compact #f-bm,body.compact .count,
+  body.compact .sync{display:none}
   body.compact .search{order:2;flex:1 1 120px;margin-top:0}
   body.compact #theme{order:3}
   main{padding:16px 13px 110px}
@@ -339,7 +359,8 @@ footer a{color:var(--t2)}
   .jump{max-width:32vw}
 }
 @media print{
-  .bar,.toc,#top{display:none}
+  .bar,.toc,#top,.bm{display:none}
+  .cards{columns:1!important}
   main{max-width:none;padding:0}
   .card{break-inside:avoid;border-color:#ccc}
   .src .sbody{display:block}
@@ -383,7 +404,8 @@ def render_entry(e, sec_no):
                     % ("（%d 条文献）" % n if n else "", inline(src)))
 
     return ('<article class="card" id="s%d-%d" data-grade="%s" data-ratio="%s">'
-            '<div class="chead"><span class="num">%d</span><h3>%s</h3></div>'
+            '<div class="chead"><span class="num">%d</span><h3>%s</h3>'
+            '<button class="bm" type="button" aria-pressed="false" title="加入书签">☆</button></div>'
             '<div class="chips">%s</div>'
             '<p class="plain">%s</p>'
             '<div class="fields">%s</div>%s</article>') % (
@@ -401,9 +423,11 @@ const jump=document.getElementById('jump');
 const fAll=document.getElementById('f-all');
 const fA=document.getElementById('f-a');
 const fP=document.getElementById('f-plain');
+const fB=document.getElementById('f-bm');
+const syncEl=document.getElementById('sync');
 const themeBtn=document.getElementById('theme');
 const topBtn=document.getElementById('top');
-let grade=null, plainOnly=false;
+let grade=null, plainOnly=false, bmOnly=false;
 
 /* 顶栏高度会随换行变化，交给 JS 实测，锚点跳转才不会被顶栏盖住 */
 function syncBar(){
@@ -450,6 +474,7 @@ function apply(){
   cards.forEach(c=>{
     let ok=true;
     if(grade && c.dataset.grade!==grade) ok=false;
+    if(ok && bmOnly && !c.classList.contains('bookmarked')) ok=false;
     if(ok && term && !c.textContent.toLowerCase().includes(term)) ok=false;
     c.classList.toggle('hidden',!ok);
     if(ok) shown++;
@@ -475,15 +500,63 @@ q.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(apply,90);}
 function setMode(mode){
   grade=(mode==='A')?'A':null;
   plainOnly=(mode==='plain');
+  bmOnly=(mode==='bm');
   document.body.classList.toggle('plain-only',plainOnly);
-  const map={'all':fAll,'A':fA,'plain':fP};
+  const map={'all':fAll,'A':fA,'plain':fP,'bm':fB};
   Object.keys(map).forEach(k=>map[k].setAttribute('aria-pressed',String(k===mode)));
   apply();
 }
 fAll.onclick=()=>setMode('all');
 fA.onclick=()=>setMode('A');
 fP.onclick=()=>setMode('plain');
+fB.onclick=()=>setMode('bm');
 fAll.setAttribute('aria-pressed','true');
+
+/* 书签：存在浏览器 localStorage，换设备不同步；导出/导入见 README。 */
+const BM_KEY='hltb-bookmarks';
+let bookmarks={};
+try{ bookmarks=JSON.parse(localStorage.getItem(BM_KEY)||'{}')||{}; }catch(e){ bookmarks={}; }
+function saveBookmarks(){ try{ localStorage.setItem(BM_KEY,JSON.stringify(bookmarks)); }catch(e){} }
+function paint(c){
+  const on=!!bookmarks[c.id];
+  c.classList.toggle('bookmarked',on);
+  const b=c.querySelector('.bm');
+  if(b){ b.textContent=on?'★':'☆'; b.setAttribute('aria-pressed',String(on));
+         b.title=on?'取消书签':'加入书签'; }
+}
+cards.forEach(paint);
+document.querySelector('main').addEventListener('click',e=>{
+  const b=e.target.closest('.bm'); if(!b) return;
+  const c=b.closest('.card'); if(!c) return;
+  if(bookmarks[c.id]) delete bookmarks[c.id]; else bookmarks[c.id]=1;
+  saveBookmarks(); paint(c);
+  if(bmOnly) apply();
+});
+
+/* 检查更新：本页头部记着“发布仓库”和生成时的“上游版本”，与 GitHub 上最新版对比。
+   任何一步失败都安静降级，不打扰阅读；离线打开也不会报错。 */
+(function(){
+  if(!syncEl) return;
+  const meta=document.querySelector('meta[name="hltb-upstream"]');
+  const cur=((meta&&meta.getAttribute('content'))||'').trim();
+  const parts=cur.split('|');
+  const repo=(parts[0]||'').trim(), curRev=(parts[1]||'').trim();
+  if(!/^[^\/]+\/[^\/]+$/.test(repo) || !curRev){ syncEl.style.display='none'; return; }
+  fetch('https://api.github.com/repos/'+repo+'/commits?path=index.html&per_page=1',
+        {headers:{'Accept':'application/vnd.github+json'}})
+    .then(r=>{ if(!r.ok) throw new Error('http '+r.status); return r.json(); })
+    .then(j=>{
+      if(!Array.isArray(j)||!j.length) throw new Error('empty');
+      const msg=(j[0].commit&&j[0].commit.message)||'';
+      const g=msg.match(/上游\s+([0-9a-f]{7,})/);
+      const latest=g?g[1]:'';
+      if(latest && latest!==curRev)
+        syncEl.innerHTML='已更新到 <span class="sv">'+latest+'</span>，刷新即用新版';
+      else
+        syncEl.innerHTML='已是最新 <span class="sv">'+curRev+'</span>';
+    })
+    .catch(()=>{ syncEl.innerHTML='<span class="sv">检查更新失败</span>'; syncEl.classList.add('err'); });
+})();
 
 if(jump){
   jump.addEventListener('change',()=>{
@@ -574,7 +647,7 @@ def main():
             '<span class="meta">%d 条</span></div>%s%s</section>'
             % (n, inline(title), len(entries),
                ('<p class="intro">%s</p>' % inline(" ".join(intro))) if intro else "",
-               "".join(cards)))
+               '<div class="cards">%s</div>' % "".join(cards)))
         jump_opts.append('<option value="sec%d">%s</option>' % (n, html.escape(title)))
 
     rev, rev_date = source_rev()
@@ -586,8 +659,9 @@ def main():
             '<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1b1b1f">'
             '<meta name="description" content="《高性价比人生指南》%s，共 %d 条建议，'
             '每条标注成本、收益、证据等级（A/B/C）与原始文献链接。单文件、零依赖、可离线阅读。">'
+            '<meta name="hltb-upstream" content="%s|%s|%s">'
             '<title>高性价比人生指南 · %s</title><style>%s</style></head><body>'
-            % (SCOPE, total, SCOPE, CSS))
+            % (SCOPE, total, PAGE_REPO, rev, rev_date, SCOPE, CSS))
 
     bar = ('<header class="bar"><h1>高性价比人生指南<small>%s</small></h1>'
            '<select class="jump" id="jump" aria-label="跳转到某一节">%s</select>'
@@ -595,11 +669,13 @@ def main():
            '<button class="btn" id="f-all">全部</button>'
            '<button class="btn" id="f-a">只看 A 级</button>'
            '<button class="btn" id="f-plain">只看说人话</button>'
+           '<button class="btn" id="f-bm">只看书签</button>'
            '<div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/>'
            '<path d="M20 20l-3.5-3.5"/></svg>'
            '<input id="q" type="search" placeholder="搜索标题、说人话、收益…" autocomplete="off">'
            '<kbd>/</kbd></div>'
            '<span class="count" id="cnt">%d / %d 条</span>'
+           '<span class="sync" id="sync"><span class="sv">检查更新中…</span></span>'
            '<button class="btn" id="theme">明/暗</button></header>' % (
                SCOPE, "".join(jump_opts), total, total))
 

@@ -3,7 +3,18 @@
 一个单文件 HTML 阅读页，把开源书《高性价比人生指南》的全部 32 节、528 条建议
 渲染成可搜索的页面。手机上打开就能看，不用装任何东西。
 
-**在线阅读：** https://cdyforever.github.io/how-to-live-better/
+**在线阅读（本 fork）：** https://widewind-7.github.io/how-to-live-better/
+**原版：** https://cdyforever.github.io/how-to-live-better/
+
+## 这个 fork 改了什么
+
+- **宽屏排版**：正文不再被 `max-width:940px` 卡死，宽屏下撑满剩余宽度；卡片按屏幕宽度自动排 1/2/3 列
+  （约 1400px 起 2 列、2000px 起 3 列），4K 全屏不再右侧一大片空白。
+- **书签**：每条标题右上角 ☆ 一键收藏（★），顶栏「只看书签」可筛出收藏的条目。
+  书签存在**浏览器本地**（localStorage，键 `hltb-bookmarks`），不上传、不跨设备。
+  换设备请自行用浏览器开发者工具导出该键的 JSON。
+- **检查更新**：页面打开时对照 GitHub 上本仓库 `index.html` 的最新提交，顶栏显示
+  「已是最新 <版本>」或「已更新到 <版本>，刷新即用新版」；离线或接口失败时安静降级。
 
 ## 这是什么
 
@@ -51,6 +62,9 @@ python build.py 1 2 16 --repo /tmp/upstream
 
 `.github/workflows/rebuild.yml` 每天 06:00（北京时间）拉取上游重新生成，
 内容有变化才提交。也可以去 Actions 页面手动触发。
+
+本 fork 已开 GitHub Pages（`main` 分支根目录），Action 提交后线上页面随之更新；
+页面顶栏的「检查更新」也读这个仓库的提交历史。
 
 ## 授权
 
