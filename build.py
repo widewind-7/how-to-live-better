@@ -311,6 +311,18 @@ footer a{color:var(--t2)}
 #top.show{opacity:1;pointer-events:auto}
 #top:hover{color:var(--brand-1);border-color:var(--brand-1)}
 
+/* 阅读位置书签的提示条：回到上次读到的位置时浮出来，可一键回顶部 */
+#pos-toast{position:fixed;left:50%;bottom:18px;z-index:45;display:flex;align-items:center;gap:10px;
+  max-width:min(92vw,520px);padding:9px 14px;border-radius:999px;background:var(--bg-elv);
+  border:1px solid var(--divider);box-shadow:0 4px 18px rgba(0,0,0,.16);
+  font-size:13px;color:var(--t2);opacity:0;pointer-events:none;
+  transform:translateX(-50%) translateY(16px);transition:opacity .25s,transform .25s}
+#pos-toast.show{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
+#pos-toast span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pos-toast button{flex:none;border:0;background:transparent;color:var(--brand-1);cursor:pointer;
+  font:500 13px/1 var(--font);padding:3px 5px;border-radius:6px}
+#pos-toast button:hover{background:var(--brand-soft)}
+
 @media (max-width:1080px){
   .toc{display:none}
   .jump{display:block}
@@ -354,7 +366,7 @@ footer a{color:var(--t2)}
   .jump{max-width:32vw}
 }
 @media print{
-  .bar,.toc,#top,.bm{display:none}
+  .bar,.toc,#top,.bm,#pos-toast{display:none}
   main{max-width:none;padding:0}
   .card{break-inside:avoid;border-color:#ccc}
   .src .sbody{display:block}
@@ -399,7 +411,7 @@ def render_entry(e, sec_no):
 
     return ('<article class="card" id="s%d-%d" data-grade="%s" data-ratio="%s">'
             '<div class="chead"><span class="num">%d</span><h3>%s</h3>'
-            '<button class="bm" type="button" aria-pressed="false" title="加入书签">☆</button></div>'
+            '<button class="bm" type="button" aria-pressed="false" title="收藏">☆</button></div>'
             '<div class="chips">%s</div>'
             '<p class="plain">%s</p>'
             '<div class="fields">%s</div>%s</article>') % (
@@ -506,8 +518,8 @@ fP.onclick=()=>setMode('plain');
 fB.onclick=()=>setMode('bm');
 fAll.setAttribute('aria-pressed','true');
 
-/* 书签：存在浏览器 localStorage，换设备不同步；导出/导入见 README。 */
-const BM_KEY='hltb-bookmarks';
+/* 收藏：把某一条标记起来，存 localStorage，换设备不同步。 */
+const BM_KEY='hltb-favorites';
 let bookmarks={};
 try{ bookmarks=JSON.parse(localStorage.getItem(BM_KEY)||'{}')||{}; }catch(e){ bookmarks={}; }
 function saveBookmarks(){ try{ localStorage.setItem(BM_KEY,JSON.stringify(bookmarks)); }catch(e){} }
@@ -516,7 +528,7 @@ function paint(c){
   c.classList.toggle('bookmarked',on);
   const b=c.querySelector('.bm');
   if(b){ b.textContent=on?'★':'☆'; b.setAttribute('aria-pressed',String(on));
-         b.title=on?'取消书签':'加入书签'; }
+         b.title=on?'取消收藏':'收藏'; }
 }
 cards.forEach(paint);
 document.querySelector('main').addEventListener('click',e=>{
@@ -526,6 +538,61 @@ document.querySelector('main').addEventListener('click',e=>{
   saveBookmarks(); paint(c);
   if(bmOnly) apply();
 });
+
+/* 阅读位置书签：自动记住你读到哪一条，下次打开自动回到那儿。
+   存 localStorage（键 hltb-readpos），只在本机浏览器有效，换设备不同步。 */
+const RP_KEY='hltb-readpos';
+const toast=document.getElementById('pos-toast');
+let rpLock=false;
+function titleOf(c){ const h=c.querySelector('h3'); return h?h.textContent.trim():''; }
+function hideToast(){ if(toast) toast.classList.remove('show'); }
+function flash(text,actionText,action){
+  if(!toast) return;
+  toast.innerHTML='';
+  const s=document.createElement('span'); s.textContent=text; toast.appendChild(s);
+  if(actionText){
+    const b=document.createElement('button'); b.type='button'; b.textContent=actionText;
+    b.onclick=()=>{ if(action) action(); hideToast(); };
+    toast.appendChild(b);
+  }
+  toast.classList.add('show');
+  clearTimeout(flash._t);
+  flash._t=setTimeout(hideToast,7000);
+}
+function currentCard(){
+  const mid=window.innerHeight*0.35;
+  let best=null,bd=Infinity;
+  cards.forEach(c=>{
+    if(c.classList.contains('hidden')) return;
+    const r=c.getBoundingClientRect();
+    if(r.bottom<0||r.top>window.innerHeight) return;
+    const d=Math.abs(r.top-mid);
+    if(d<bd){bd=d;best=c;}
+  });
+  return best||cards.find(c=>!c.classList.contains('hidden'))||cards[0];
+}
+function savePos(){
+  if(rpLock) return;
+  const c=currentCard();
+  if(!c) return;
+  try{ localStorage.setItem(RP_KEY,JSON.stringify({id:c.id,title:titleOf(c),t:Date.now()})); }catch(e){}
+}
+function restorePos(){
+  /* 带 #锚点 进来（别人发的具体条目链接）时不抢跳，尊重用户当下的意图 */
+  if(location.hash) return;
+  let s=null;
+  try{ s=JSON.parse(localStorage.getItem(RP_KEY)||'null'); }catch(e){}
+  if(!s||!s.id) return;
+  const el=document.getElementById(s.id);
+  if(!el) return;
+  rpLock=true;
+  const go=()=>{ el.scrollIntoView({block:'start'}); };
+  requestAnimationFrame(go);
+  setTimeout(go,400);          /* 字体/图片加载可能让版面轻微位移，再对一次 */
+  setTimeout(()=>{rpLock=false;},1500);
+  const when=s.t?('（'+new Date(s.t).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})+'）'):'';
+  flash('已回到上次读到的地方：'+(s.title||'')+when,'回顶部',()=>window.scrollTo({top:0,behavior:'smooth'}));
+}
 
 /* 检查更新：本页头部记着“发布仓库”和生成时的“上游版本”，与 GitHub 上最新版对比。
    任何一步失败都安静降级，不打扰阅读；离线打开也不会报错。 */
@@ -584,12 +651,16 @@ function onScroll(){
   const want = compact ? (y>200) : (y>420);
   if(want!==compact){compact=want;document.body.classList.toggle('compact',compact);syncBar();}
   topBtn.classList.toggle('show',y>900);
+  /* 阅读位置节流保存：滚动停稳约 0.8 秒后写一次，避免每帧都写 */
+  if(!savePos._t) savePos._t=setTimeout(()=>{savePos._t=null;savePos();},800);
 }
 addEventListener('scroll',()=>{
   if(ticking) return;
   ticking=true;
   requestAnimationFrame(()=>{ticking=false;onScroll();});
 },{passive:true});
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') savePos(); });
+addEventListener('pagehide',savePos);
 addEventListener('resize',syncBar);
 if(document.fonts&&document.fonts.ready) document.fonts.ready.then(syncBar);
 syncBar();
@@ -605,6 +676,9 @@ const io=new IntersectionObserver(es=>{
 },{rootMargin:'-70px 0px -75% 0px'});
 cards.forEach(c=>io.observe(c));
 if(jump) secs.forEach(s=>io.observe(s));
+
+/* 全部就绪后，恢复上次的阅读位置 */
+restorePos();
 """
 
 
@@ -663,7 +737,7 @@ def main():
            '<button class="btn" id="f-all">全部</button>'
            '<button class="btn" id="f-a">只看 A 级</button>'
            '<button class="btn" id="f-plain">只看说人话</button>'
-           '<button class="btn" id="f-bm">只看书签</button>'
+           '<button class="btn" id="f-bm">只看收藏</button>'
            '<div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/>'
            '<path d="M20 20l-3.5-3.5"/></svg>'
            '<input id="q" type="search" placeholder="搜索标题、说人话、收益…" autocomplete="off">'
@@ -690,6 +764,7 @@ def main():
              '<div class="empty hidden" id="empty">没有匹配的条目</div>%s'
              '</main></div>'
              '<button id="top" title="回到顶部" aria-label="回到顶部">↑</button>'
+             '<div id="pos-toast" role="status" aria-live="polite"></div>'
              % ("".join(sec_toc), "".join(sec_html), footer))
 
     # 注意：JS 字符串只含脚本体，<script> 开合标签在这里拼。
