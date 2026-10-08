@@ -240,8 +240,14 @@ strong{font-weight:600;color:var(--t1)}
 .shell{display:flex;align-items:flex-start}
 .toc{position:sticky;top:var(--bar);flex:none;width:var(--side);height:calc(100vh - var(--bar));
   overflow-y:auto;padding:18px 14px 80px 18px;background:var(--bg-alt);border-right:1px solid var(--divider)}
-.toc .gt{font-size:13px;font-weight:600;margin:0 0 6px;color:var(--t1);display:flex;justify-content:space-between;align-items:baseline}
-.toc .gt small{font-weight:400;font-size:11px;color:var(--t3)}
+.toc .gt{font:600 13px/1.5 var(--font);width:100%;margin:0 0 4px;padding:4px 6px;border:0;border-radius:6px;
+  background:transparent;color:var(--t1);cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px}
+.toc .gt:hover{background:var(--bg-elv)}
+.toc .gt::before{content:"\25B8";flex:none;font-size:9px;color:var(--t3)}
+.toc .grp.open .gt::before{content:"\25BE"}
+.toc .gt small{margin-left:auto;font-weight:400;font-size:11px;color:var(--t3)}
+.toc .gl{display:none}
+.toc .grp.open .gl{display:block}
 .toc .grp{padding-bottom:14px;margin-bottom:14px;border-bottom:1px solid var(--divider)}
 .toc .grp:last-child{border-bottom:0;margin-bottom:0}
 .toc a{display:flex;gap:6px;align-items:baseline;padding:3px 6px;border-radius:6px;font-size:12.5px;
@@ -586,6 +592,7 @@ function restorePos(){
   const el=document.getElementById(s.id);
   if(!el) return;
   rpLock=true;
+  enableAuto();               /* 回到上次位置时，也让当前节展开 */
   const go=()=>{ el.scrollIntoView({block:'start'}); };
   requestAnimationFrame(go);
   setTimeout(go,400);          /* 字体/图片加载可能让版面轻微位移，再对一次 */
@@ -648,6 +655,7 @@ topBtn.onclick=()=>window.scrollTo({top:0,behavior:'smooth'});
 let compact=false, ticking=false;
 function onScroll(){
   const y=window.scrollY;
+  if(y>0) enableAuto();
   const want = compact ? (y>200) : (y>420);
   if(want!==compact){compact=want;document.body.classList.toggle('compact',compact);syncBar();}
   topBtn.classList.toggle('show',y>900);
@@ -666,16 +674,46 @@ if(document.fonts&&document.fonts.ready) document.fonts.ready.then(syncBar);
 syncBar();
 
 const links=[...document.querySelectorAll('.toc a')];
+
+/* 目录默认折叠：点节标题展开/收起该节的条目 */
+function setGroupOpen(secId,on){
+  const g=document.querySelector('.toc .grp[data-sec="'+secId+'"]'); if(!g) return;
+  g.classList.toggle('open',on);
+  const t=g.querySelector('.gt'); if(t) t.setAttribute('aria-expanded',String(on));
+}
+const tocEl=document.querySelector('.toc');
+if(tocEl) tocEl.addEventListener('click',e=>{
+  const t=e.target.closest('.gt'); if(!t) return;
+  const g=t.closest('.grp'); if(!g) return;
+  setGroupOpen(g.dataset.sec, !g.classList.contains('open'));
+});
+
+/* 滚到哪一节，就自动展开那一节；离开时收起，只留当前这一节展开。
+   页面刚打开时先不自动展开，保持全部折叠；用户一开始滚动（或跳回上次位置）才生效。 */
+let autoSec=null, allowAuto=false;
+function enableAuto(){ allowAuto=true; }
+function focusSection(id){
+  if(!allowAuto || autoSec===id) return;
+  if(autoSec) setGroupOpen(autoSec,false);
+  setGroupOpen(id,true);
+  autoSec=id;
+}
+addEventListener('wheel',enableAuto,{passive:true});
+addEventListener('touchstart',enableAuto,{passive:true});
+addEventListener('keydown',enableAuto);
+
 const io=new IntersectionObserver(es=>{
   es.forEach(e=>{ if(e.isIntersecting){
     if(e.target.classList.contains('card'))
       links.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+e.target.id));
-    else if(jump && e.target.tagName==='SECTION')
-      jump.value=e.target.id;
+    else if(e.target.tagName==='SECTION'){
+      if(jump) jump.value=e.target.id;
+      focusSection(e.target.id);
+    }
   }});
 },{rootMargin:'-70px 0px -75% 0px'});
 cards.forEach(c=>io.observe(c));
-if(jump) secs.forEach(s=>io.observe(s));
+secs.forEach(s=>io.observe(s));
 
 /* 全部就绪后，恢复上次的阅读位置 */
 restorePos();
@@ -708,8 +746,9 @@ def main():
                          '<i>%d</i><span>%s</span></a>'
                          % (n, e["no"], html.escape(e["title"], quote=True),
                             RATIO_ORDER.get(r, 2), e["no"], html.escape(short)))
-        sec_toc.append('<div class="grp"><div class="gt">%s<small>%d 条</small></div>%s</div>'
-                       % (inline(title), len(entries), "".join(links)))
+        sec_toc.append('<div class="grp" data-sec="sec%d"><button class="gt" type="button" aria-expanded="false">%s'
+                       '<small>%d 条</small></button><div class="gl">%s</div></div>'
+                       % (n, inline(title), len(entries), "".join(links)))
         sec_html.append(
             '<section id="sec%d"><div class="sec-h"><h2>%s</h2>'
             '<span class="meta">%d 条</span></div>%s%s</section>'
